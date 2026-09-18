@@ -1,0 +1,183 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:entities="clr-namespace:TrafficHunt.Domain.Entities;assembly=TrafficHunt.Domain"
+             xmlns:local="clr-namespace:TrafficHunt.Maui"
+             x:Class="TrafficHunt.Maui.LeadsPage"
+             Title="Leads">
+
+    <ContentPage.Resources>
+        <local:BoolToTextConverter x:Key="RepliedConverter" TrueText="replied" FalseText="pending" />
+    </ContentPage.Resources>
+
+    <Grid ColumnDefinitions="1.3*,*"
+          RowDefinitions="Auto,*"
+          ColumnSpacing="16"
+          RowSpacing="10"
+          Padding="20">
+
+        <Grid Grid.Row="0"
+              Grid.ColumnSpan="2"
+              ColumnDefinitions="*,Auto,Auto"
+              ColumnSpacing="10">
+            <Label
+                Grid.Column="0"
+                Text="Leads"
+                Style="{StaticResource SectionHeader}"
+                VerticalOptions="Center" />
+            <ActivityIndicator
+                Grid.Column="1"
+                x:Name="BusyIndicator"
+                IsVisible="False"
+                VerticalOptions="Center" />
+            <Button
+                Grid.Column="2"
+                Text="Refresh"
+                Clicked="OnRefreshClicked" />
+        </Grid>
+
+        <!-- Lead list -->
+        <Grid Grid.Row="1" Grid.Column="0" RowDefinitions="Auto,*" RowSpacing="8">
+            <Entry
+                Grid.Row="0"
+                x:Name="FilterEntry"
+                Placeholder="Filter by name, keyword or comment"
+                TextChanged="OnFilterChanged" />
+            <CollectionView
+                Grid.Row="1"
+                x:Name="LeadList"
+                SelectionMode="Single"
+                SelectionChanged="OnLeadSelected">
+                <CollectionView.EmptyView>
+                    <Label
+                        Text="No leads yet. Run a hunt from the Search tab."
+                        Style="{StaticResource HintLabel}"
+                        HorizontalOptions="Center" />
+                </CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="entities:Lead">
+                        <Border Style="{StaticResource Card}" Margin="0,4">
+                            <VerticalStackLayout Spacing="2">
+                                <Label Text="{Binding Name}" FontAttributes="Bold" />
+                                <Label
+                                    Text="{Binding CommentText}"
+                                    LineBreakMode="TailTruncation"
+                                    MaxLines="2" />
+                                <Label
+                                    Text="{Binding Keyword, StringFormat='keyword: {0}'}"
+                                    FontSize="11"
+                                    TextColor="{StaticResource MutedColor}" />
+                                <Label
+                                    Text="{Binding YourReply, StringFormat='reply: {0}'}"
+                                    FontSize="11"
+                                    TextColor="{StaticResource SuccessColor}" />
+                                <Label
+                                    Text="{Binding Replied, Converter={StaticResource RepliedConverter}}"
+                                    FontSize="11"
+                                    FontAttributes="Bold"
+                                    TextColor="{StaticResource MutedColor}" />
+                            </VerticalStackLayout>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </Grid>
+
+        <!-- Lead details -->
+        <ScrollView Grid.Row="1" Grid.Column="1">
+            <VerticalStackLayout Spacing="8">
+                <Label Text="Selected lead" Style="{StaticResource SectionHeader}" />
+
+                <Label
+                    x:Name="EmptyDetailLabel"
+                    Text="Select a lead on the left to see the details."
+                    Style="{StaticResource HintLabel}" />
+
+                <VerticalStackLayout x:Name="DetailPanel" Spacing="8" IsVisible="False">
+                    <Label Text="Author" Style="{StaticResource FieldLabel}" />
+                    <Label x:Name="DetailNameLabel" />
+
+                    <Label Text="Video / comment" Style="{StaticResource FieldLabel}" />
+                    <Label x:Name="DetailMetaLabel" Style="{StaticResource HintLabel}" />
+
+                    <Label Text="Comment" Style="{StaticResource FieldLabel}" />
+                    <Label x:Name="DetailCommentLabel" />
+
+                    <Label Text="Your reply" Style="{StaticResource FieldLabel}" />
+                    <Editor
+                        x:Name="ReplyEditor"
+                        HeightRequest="120"
+                        AutoSize="TextChanges"
+                        Placeholder="Write a reply, or draft one with the AI..." />
+
+                    <Button
+                        x:Name="GenerateButton"
+                        Text="Generate AI reply"
+                        Clicked="OnGenerateClicked" />
+                    <Button
+                        x:Name="SendButton"
+                        Text="Send reply"
+                        Style="{StaticResource PrimaryButton}"
+                        Clicked="OnSendClicked" />
+
+                    <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+                        <Button
+                            Grid.Column="0"
+                            Text="Open on YouTube"
+                            Clicked="OnOpenClicked" />
+                        <Button
+                            Grid.Column="1"
+                            Text="Delete lead"
+                            Style="{StaticResource DangerButton}"
+                            Clicked="OnDeleteClicked" />
+                    </Grid>
+
+                    <Label x:Name="StatusLabel" Style="{StaticResource StatusText}" />
+                </VerticalStackLayout>
+
+                <BoxView HeightRequest="1" Color="{StaticResource BorderColor}" Margin="0,12" />
+
+                <Label Text="Bulk reply" Style="{StaticResource SectionHeader}" />
+                <Label
+                    Text="Sends a reply to every lead that has not been replied to yet."
+                    Style="{StaticResource HintLabel}" />
+
+                <Label Text="Mode" Style="{StaticResource FieldLabel}" />
+                <Picker x:Name="BulkModePicker" SelectedIndexChanged="OnBulkModeChanged">
+                    <Picker.ItemsSource>
+                        <x:Array Type="{x:Type x:String}">
+                            <x:String>Single message (spintax supported)</x:String>
+                            <x:String>Round-robin messages</x:String>
+                            <x:String>AI generated</x:String>
+                        </x:Array>
+                    </Picker.ItemsSource>
+                </Picker>
+
+                <Label x:Name="BulkMessageLabel" Text="Message" Style="{StaticResource FieldLabel}" />
+                <Editor
+                    x:Name="BulkMessageEditor"
+                    HeightRequest="90"
+                    AutoSize="TextChanges"
+                    Placeholder="Hi {there|friend}, thanks for reaching out..." />
+
+                <Label
+                    x:Name="BulkMessagesLabel"
+                    Text="Message variants (one per line)"
+                    Style="{StaticResource FieldLabel}"
+                    IsVisible="False" />
+                <Editor
+                    x:Name="BulkMessagesEditor"
+                    HeightRequest="90"
+                    AutoSize="TextChanges"
+                    IsVisible="False" />
+
+                <Button
+                    x:Name="BulkSendButton"
+                    Text="Send to all pending leads"
+                    Style="{StaticResource PrimaryButton}"
+                    Clicked="OnBulkSendClicked" />
+            </VerticalStackLayout>
+        </ScrollView>
+    </Grid>
+
+</ContentPage>

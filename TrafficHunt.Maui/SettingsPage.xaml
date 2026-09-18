@@ -1,0 +1,65 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="TrafficHunt.Maui.SettingsPage"
+             Title="Settings">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="8" MaximumWidthRequest="760" HorizontalOptions="Start">
+
+            <Label Text="Settings" Style="{StaticResource SectionHeader}" />
+            <Label
+                x:Name="ConfigPathLabel"
+                Style="{StaticResource HintLabel}"
+                SemanticProperties.Description="Location of the configuration file" />
+
+            <Label Text="Database connection string" Style="{StaticResource FieldLabel}" />
+            <Entry x:Name="ConnectionStringEntry" Placeholder="Server=localhost;Database=traffichuntdb;User=root;Password=" />
+
+            <Label Text="YouTube API key" Style="{StaticResource FieldLabel}" />
+            <Entry x:Name="ApiKeyEntry" Placeholder="AIza..." />
+
+            <Label Text="YouTube application name" Style="{StaticResource FieldLabel}" />
+            <Entry x:Name="AppNameEntry" Placeholder="TrafficHunt" />
+
+            <Label Text="LLM (Ollama) URL" Style="{StaticResource FieldLabel}" />
+            <Entry x:Name="LlmUrlEntry" Placeholder="http://localhost:11434" />
+
+            <Label Text="LLM model" Style="{StaticResource FieldLabel}" />
+            <Entry x:Name="LlmModelEntry" Placeholder="llama3.2" />
+
+            <Label Text="Default lead qualification prompt" Style="{StaticResource FieldLabel}" />
+            <Editor
+                x:Name="DefaultPromptEditor"
+                HeightRequest="90"
+                AutoSize="TextChanges" />
+
+            <Label Text="Default max results" Style="{StaticResource FieldLabel}" />
+            <Entry x:Name="DefaultMaxEntry" Keyboard="Numeric" Placeholder="10" />
+
+            <Button
+                x:Name="SaveButton"
+                Text="Save settings"
+                Style="{StaticResource PrimaryButton}"
+                Clicked="OnSaveClicked" />
+            <Label
+                Text="Connection string and API key changes are applied after restarting the app."
+                Style="{StaticResource HintLabel}" />
+
+            <BoxView HeightRequest="1" Color="{StaticResource BorderColor}" Margin="0,8" />
+
+            <Button
+                x:Name="TestButton"
+                Text="Test database connection"
+                Clicked="OnTestClicked" />
+            <Button
+                x:Name="MigrateButton"
+                Text="Apply database migrations"
+                Clicked="OnMigrateClicked" />
+
+            <ActivityIndicator x:Name="BusyIndicator" IsVisible="False" />
+            <Label x:Name="StatusLabel" Style="{StaticResource StatusText}" />
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

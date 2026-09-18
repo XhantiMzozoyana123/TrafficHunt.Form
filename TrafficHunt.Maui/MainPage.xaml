@@ -1,0 +1,101 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:dto="clr-namespace:TrafficHunt.Application.Dtos;assembly=TrafficHunt.Application"
+             x:Class="TrafficHunt.Maui.MainPage"
+             Title="Search">
+
+    <Grid ColumnDefinitions="380,*"
+          ColumnSpacing="16"
+          Padding="20">
+
+        <!-- Hunt form -->
+        <ScrollView Grid.Column="0">
+            <VerticalStackLayout Spacing="10">
+                <Label
+                    Text="Traffic Hunt"
+                    Style="{StaticResource Headline}"
+                    SemanticProperties.HeadingLevel="Level1" />
+                <Label
+                    Text="Search YouTube, let the AI qualify every comment and keep the leads that matter."
+                    Style="{StaticResource SubHeadline}"
+                    SemanticProperties.HeadingLevel="Level2" />
+
+                <Label Text="Keyword" Style="{StaticResource FieldLabel}" />
+                <Entry x:Name="KeywordEntry" Placeholder="e.g. fitness coach" />
+
+                <Label Text="Max results (videos and comments per video)" Style="{StaticResource FieldLabel}" />
+                <Entry x:Name="MaxResultsEntry" Keyboard="Numeric" Text="10" />
+
+                <Label Text="Lead qualification prompt" Style="{StaticResource FieldLabel}" />
+                <Editor
+                    x:Name="PromptEditor"
+                    HeightRequest="110"
+                    AutoSize="TextChanges"
+                    Placeholder="Describe what makes a comment a lead..." />
+
+                <Button
+                    x:Name="SearchButton"
+                    Text="Search videos"
+                    Clicked="OnSearchClicked"
+                    SemanticProperties.Hint="Searches YouTube for the keyword and lists the matching videos" />
+                <Button
+                    x:Name="HuntButton"
+                    Text="Run hunt"
+                    Style="{StaticResource PrimaryButton}"
+                    Clicked="OnHuntClicked"
+                    SemanticProperties.Hint="Searches videos, filters their comments with the AI and saves the leads" />
+                <Button
+                    x:Name="ClearButton"
+                    Text="Clear results"
+                    Clicked="OnClearClicked" />
+
+                <ActivityIndicator x:Name="BusyIndicator" IsVisible="False" />
+                <Label x:Name="StatusLabel" Style="{StaticResource StatusText}" />
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Search results -->
+        <Grid Grid.Column="1" RowDefinitions="Auto,*" RowSpacing="8">
+            <Label Grid.Row="0" Text="Videos" Style="{StaticResource SectionHeader}" />
+            <CollectionView x:Name="VideoList" Grid.Row="1" SelectionMode="None">
+                <CollectionView.EmptyView>
+                    <Label
+                        Text="No videos yet - run a search."
+                        Style="{StaticResource HintLabel}"
+                        HorizontalOptions="Center" />
+                </CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="dto:YouTubeVideoDto">
+                        <Border Style="{StaticResource Card}" Margin="0,4">
+                            <Grid ColumnDefinitions="96,*" ColumnSpacing="12">
+                                <Image
+                                    Grid.Column="0"
+                                    Source="{Binding ThumbnailUrl}"
+                                    Aspect="AspectFill"
+                                    HeightRequest="54"
+                                    WidthRequest="96" />
+                                <VerticalStackLayout Grid.Column="1" Spacing="2">
+                                    <Label
+                                        Text="{Binding Title}"
+                                        FontAttributes="Bold"
+                                        LineBreakMode="TailTruncation"
+                                        MaxLines="2" />
+                                    <Label
+                                        Text="{Binding ChannelTitle}"
+                                        FontSize="12"
+                                        TextColor="{StaticResource MutedColor}" />
+                                    <Label
+                                        Text="{Binding VideoId, StringFormat='id: {0}'}"
+                                        FontSize="11"
+                                        TextColor="{StaticResource MutedColor}" />
+                                </VerticalStackLayout>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+        </Grid>
+    </Grid>
+
+</ContentPage>
