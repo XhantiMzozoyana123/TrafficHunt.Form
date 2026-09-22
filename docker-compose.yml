@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   # ---------------------------------------------------------------------------
   # TrafficHunt.Web - the MVC app (now uses SQLite, no MySQL needed)
