@@ -1,0 +1,120 @@
+version: "3.9"
+
+services:
+  # ---------------------------------------------------------------------------
+  # TrafficHunt.Web - the MVC app you originally asked to run
+  # ---------------------------------------------------------------------------
+  web:
+    build:
+      context: .
+      dockerfile: TrafficHunt.Web/Dockerfile
+    container_name: traffichunt-web
+    restart: unless-stopped
+    env_file:
+      - ./docker/.env
+    environment:
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
+      - ASPNETCORE_URLS=${ASPNETCORE_URLS}
+      - ConnectionStrings__DefaultConnection=${CONNECTION_STRING}
+      - YouTube__ApiKey=${YOUTUBE_API_KEY}
+      - LLM__Url=${LLM_URL}
+      - LLM__Model=${LLM_MODEL}
+    ports:
+      - "5000:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      # ollama is optional for the app to start; remove the depends_on line
+      # below if you want to use the remote Ollama instance instead.
+      ollama:
+        condition: service_started
+    networks:
+      - traffichunt
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    profiles:
+      - default
+
+  # ---------------------------------------------------------------------------
+  # MySQL - same traffichuntdb the MAUI app uses
+  # ---------------------------------------------------------------------------
+  mysql:
+    image: mysql:8.4
+    container_name: traffichunt-mysql
+    restart: unless-stopped
+    env_file:
+      - ./docker/.env
+    environment:
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - traffichunt-mysql-data:/var/lib/mysql
+    networks:
+      - traffichunt
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    profiles:
+      - default
+
+  # ---------------------------------------------------------------------------
+  # Ollama - local LLM backend (llama3:latest is pulled on first use)
+  # ---------------------------------------------------------------------------
+  # If you prefer the remote Ollama instance already configured in
+  # appsettings.json (http://46.202.170.203:11434), either:
+  #   1) Leave this service out of compose, OR
+  #   2) Set LLM_URL=http://46.202.170.203:11434/api/generate in .env
+  # Keep the bind mount if you want models/persisted state to survive restarts.
+  ollama:
+    image: ollama/ollama:latest
+    container_name: traffichunt-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - traffichunt-ollama-data:/root/.ollama
+    networks:
+      - traffichunt
+    profiles:
+      - ollama
+
+  # ---------------------------------------------------------------------------
+  # Nginx - optional reverse proxy for production HTTPS
+  # ---------------------------------------------------------------------------
+  # Enable with: docker compose --profile nginx up -d
+  # Then run: sudo certbot --nginx -d yourdomain.com
+  nginx:
+    image: nginx:alpine
+    container_name: traffichunt-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./docker/nginx/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - web
+    networks:
+      - traffichunt
+    profiles:
+      - nginx
+
+volumes:
+  traffichunt-mysql-data:
+  traffichunt-ollama-data:
+
+networks:
+  traffichunt:
+    driver: bridge

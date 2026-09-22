@@ -4,4 +4,6 @@
   <Project Path="TrafficHunt.Form/TrafficHunt.Form.csproj" />
   <Project Path="TrafficHunt.Infrastructure/TrafficHunt.Infrastructure.csproj" />
   <Project Path="TrafficHunt.Maui/TrafficHunt.Maui.csproj" />
+  <Project Path="TrafficHunt.Web/TrafficHunt.Web.csproj" />
 </Solution>
+

@@ -59,6 +59,7 @@ namespace TrafficHunt.Maui
 
             // UI
             builder.Services.AddSingleton<AppShell>();
+            builder.Services.AddTransient<CommentsPage>();
             builder.Services.AddTransient<MainPage>();
             builder.Services.AddTransient<LeadsPage>();
             builder.Services.AddTransient<SettingsPage>();

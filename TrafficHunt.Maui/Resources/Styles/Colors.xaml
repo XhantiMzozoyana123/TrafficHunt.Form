@@ -10,4 +10,10 @@
     <Color x:Key="DangerColor">#C0392B</Color>
     <Color x:Key="SuccessColor">#1E8E4E</Color>
 
+    <!-- Table and page colours -->
+    <Color x:Key="TextColor">#1F2A37</Color>
+    <Color x:Key="PageBackgroundColor">#EEF3F9</Color>
+    <Color x:Key="TableHeaderColor">#DCE6F2</Color>
+    <Color x:Key="RowSelectedColor">#D6E8FF</Color>
+
 </ResourceDictionary>

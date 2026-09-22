@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using TrafficHunt.Application.Interfaces;
 using TrafficHunt.Domain;
 
 namespace TrafficHunt.Maui
@@ -29,9 +30,10 @@ namespace TrafficHunt.Maui
             ConnectionStringEntry.Text = _configuration.GetConnectionString("DefaultConnection") ?? string.Empty;
             ApiKeyEntry.Text = _configuration["YouTube:ApiKey"] ?? string.Empty;
             AppNameEntry.Text = _configuration["YouTube:ApplicationName"] ?? "TrafficHunt";
-            LlmUrlEntry.Text = _configuration["LLM:Url"] ?? "http://localhost:11434";
+            LlmUrlEntry.Text = _configuration["LLM:Url"] ?? "http://46.202.170.203:11434/api/generate";
             LlmModelEntry.Text = _configuration["LLM:Model"] ?? string.Empty;
             DefaultPromptEditor.Text = _configuration["Hunt:DefaultPrompt"] ?? string.Empty;
+            DefaultReplyPromptEditor.Text = _configuration["Hunt:DefaultReplyPrompt"] ?? string.Empty;
             DefaultMaxEntry.Text = _configuration["Hunt:DefaultMaxResults"] ?? "10";
         }
 
@@ -47,6 +49,7 @@ namespace TrafficHunt.Maui
                 SetValue(root, "LLM", "Url", LlmUrlEntry.Text?.Trim());
                 SetValue(root, "LLM", "Model", LlmModelEntry.Text?.Trim());
                 SetValue(root, "Hunt", "DefaultPrompt", DefaultPromptEditor.Text?.Trim());
+                SetValue(root, "Hunt", "DefaultReplyPrompt", DefaultReplyPromptEditor.Text?.Trim());
                 SetValue(root, "Hunt", "DefaultMaxResults", DefaultMaxEntry.Text?.Trim());
 
                 var options = new JsonSerializerOptions { WriteIndented = true };
@@ -92,6 +95,48 @@ namespace TrafficHunt.Maui
             });
         }
 
+        /// <summary>
+        /// Sends a small prompt to the configured Ollama endpoint
+        /// (http://46.202.170.203:11434/api/generate) so the LLM URL/model can be verified
+        /// from the app, the same way the endpoint would be checked in Postman.
+        /// </summary>
+        private async void OnTestLlmClicked(object? sender, EventArgs e)
+        {
+            await RunBusyAsync(async () =>
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var llmService = scope.ServiceProvider.GetRequiredService<ILLMService>();
+
+                var reply = (await llmService.GenerateTextAsync("Reply with only the word: ok")).Trim();
+
+                if (reply.Length > 300)
+                {
+                    reply = $"{reply[..300]}...";
+                }
+
+                StatusLabel.Text = string.IsNullOrWhiteSpace(reply)
+                    ? "The LLM responded with an empty reply. Check the model name on the server."
+                    : $"LLM replied: {reply}";
+            });
+        }
+
+        /// <summary>
+        /// Calls the YouTube Data API with the configured API key so an invalid, disabled or
+        /// restricted key is reported here rather than in the middle of a hunt.
+        /// </summary>
+        private async void OnTestYouTubeClicked(object? sender, EventArgs e)
+        {
+            await RunBusyAsync(async () =>
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var youTubeService = scope.ServiceProvider.GetRequiredService<IYouTubeService>();
+
+                await youTubeService.ValidateApiKeyAsync();
+
+                StatusLabel.Text = "YouTube Data API key is valid.";
+            });
+        }
+
         private async void OnMigrateClicked(object? sender, EventArgs e)
         {
             await RunBusyAsync(async () =>
@@ -132,6 +177,8 @@ namespace TrafficHunt.Maui
             BusyIndicator.IsVisible = isBusy;
             SaveButton.IsEnabled = !isBusy;
             TestButton.IsEnabled = !isBusy;
+            TestLlmButton.IsEnabled = !isBusy;
+            TestYouTubeButton.IsEnabled = !isBusy;
             MigrateButton.IsEnabled = !isBusy;
         }
     }

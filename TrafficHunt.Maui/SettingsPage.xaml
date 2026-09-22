@@ -23,16 +23,23 @@
             <Entry x:Name="AppNameEntry" Placeholder="TrafficHunt" />
 
             <Label Text="LLM (Ollama) URL" Style="{StaticResource FieldLabel}" />
-            <Entry x:Name="LlmUrlEntry" Placeholder="http://localhost:11434" />
+            <Entry x:Name="LlmUrlEntry" Placeholder="http://46.202.170.203:11434/api/generate" />
 
             <Label Text="LLM model" Style="{StaticResource FieldLabel}" />
-            <Entry x:Name="LlmModelEntry" Placeholder="llama3.2" />
+            <Entry x:Name="LlmModelEntry" Placeholder="llama3:latest" />
 
             <Label Text="Default lead qualification prompt" Style="{StaticResource FieldLabel}" />
             <Editor
                 x:Name="DefaultPromptEditor"
                 HeightRequest="90"
                 AutoSize="TextChanges" />
+
+            <Label Text="Default AI reply prompt" Style="{StaticResource FieldLabel}" />
+            <Editor
+                x:Name="DefaultReplyPromptEditor"
+                HeightRequest="90"
+                AutoSize="TextChanges"
+                Placeholder="How the AI should respond and what it should say when auto-replying to comments." />
 
             <Label Text="Default max results" Style="{StaticResource FieldLabel}" />
             <Entry x:Name="DefaultMaxEntry" Keyboard="Numeric" Placeholder="10" />
@@ -52,6 +59,14 @@
                 x:Name="TestButton"
                 Text="Test database connection"
                 Clicked="OnTestClicked" />
+            <Button
+                x:Name="TestLlmButton"
+                Text="Test LLM connection"
+                Clicked="OnTestLlmClicked" />
+            <Button
+                x:Name="TestYouTubeButton"
+                Text="Test YouTube API key"
+                Clicked="OnTestYouTubeClicked" />
             <Button
                 x:Name="MigrateButton"
                 Text="Apply database migrations"

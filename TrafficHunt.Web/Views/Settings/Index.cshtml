@@ -1,0 +1,61 @@
+@using Microsoft.Extensions.Configuration
+@using Microsoft.Extensions.DependencyInjection
+@{
+    ViewData["Title"] = "Settings";
+    var saved = (bool?)(TempData["Saved"] ?? false);
+    var error = (string?)TempData["Error"];
+}
+
+<h1 class="h4 mb-3">Settings</h1>
+
+@if (saved == true)
+{
+    <div class="alert alert-success">Settings saved. Restart the app to apply connection and API key changes.</div>
+}
+@if (!string.IsNullOrEmpty(error))
+{
+    <div class="alert alert-danger">@(error)</div>
+}
+
+<form asp-action="Save" method="post" class="row g-3" style="max-width: 760px;">
+    <div class="col-12">
+        <label class="form-label" for="connectionString">Database connection string</label>
+        <input type="text" class="form-control" id="connectionString" name="connectionString"
+               value="@(Context.RequestServices.GetRequiredService<IConfiguration>().GetConnectionString("DefaultConnection"))" />
+    </div>
+    <div class="col-12">
+        <label class="form-label" for="apiKey">YouTube API key</label>
+        <input type="text" class="form-control" id="apiKey" name="apiKey" value="@(Config("YouTube:ApiKey"))" />
+    </div>
+    <div class="col-12">
+        <label class="form-label" for="applicationName">YouTube application name</label>
+        <input type="text" class="form-control" id="applicationName" name="applicationName" value="@(Config("YouTube:ApplicationName"))" />
+    </div>
+    <div class="col-12">
+        <label class="form-label" for="llmUrl">LLM (Ollama) URL</label>
+        <input type="text" class="form-control" id="llmUrl" name="llmUrl" value="@(Config("LLM:Url"))" />
+    </div>
+    <div class="col-12">
+        <label class="form-label" for="llmModel">LLM model</label>
+        <input type="text" class="form-control" id="llmModel" name="llmModel" value="@(Config("LLM:Model"))" />
+    </div>
+    <div class="col-12">
+        <label class="form-label" for="defaultPrompt">Default lead qualification prompt</label>
+        <textarea class="form-control" id="defaultPrompt" name="defaultPrompt" rows="3">@(Config("Hunt:DefaultPrompt"))</textarea>
+    </div>
+    <div class="col-12">
+        <label class="form-label" for="defaultReplyPrompt">Default AI reply prompt</label>
+        <textarea class="form-control" id="defaultReplyPrompt" name="defaultReplyPrompt" rows="3">@(Config("Hunt:DefaultReplyPrompt"))</textarea>
+    </div>
+    <div class="col-12">
+        <label class="form-label" for="defaultMaxResults">Default max results</label>
+        <input type="number" class="form-control" id="defaultMaxResults" name="defaultMaxResults" value="@(Config("Hunt:DefaultMaxResults"))" />
+    </div>
+    <div class="col-12">
+        <button type="submit" class="btn btn-primary">Save settings</button>
+    </div>
+</form>
+
+@functions {
+    private string? Config(string key) => Context.RequestServices.GetRequiredService<IConfiguration>()[key];
+}

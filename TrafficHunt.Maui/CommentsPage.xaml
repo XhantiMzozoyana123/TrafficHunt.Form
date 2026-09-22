@@ -1,0 +1,350 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:TrafficHunt.Maui"
+             x:Class="TrafficHunt.Maui.CommentsPage"
+             Title="Comment finder"
+             Shell.NavBarIsVisible="False"
+             BackgroundColor="{StaticResource PageBackgroundColor}">
+
+    <Grid RowDefinitions="Auto,*" RowSpacing="12" Padding="20">
+
+        <!-- Toolbar -->
+        <Border Grid.Row="0" Style="{StaticResource Card}">
+            <VerticalStackLayout Spacing="10">
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <Label
+                        Grid.Column="0"
+                        Text="Comment finder"
+                        Style="{StaticResource SectionHeader}"
+                        VerticalOptions="Center"
+                        SemanticProperties.HeadingLevel="Level1" />
+                    <Button
+                        Grid.Column="1"
+                        x:Name="ToolbarToggleButton"
+                        Text="Hide"
+                        Clicked="OnToolbarToggleClicked" />
+                </Grid>
+                <VerticalStackLayout x:Name="ToolbarContent" Spacing="10">
+                    <Label
+                        Text="Step 1 fetches every comment into the table. Step 2 sends that whole list to the AI as one JSON payload and keeps only the matches."
+                        Style="{StaticResource HintLabel}" />
+
+                    <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="8">
+                        <Entry
+                            Grid.Column="0"
+                            x:Name="KeywordEntry"
+                            Placeholder="Keyword, e.g. traffic leads for contractors"
+                            Completed="OnFetchClicked"
+                            SemanticProperties.Hint="Press Enter to fetch the comments" />
+                        <Button
+                            Grid.Column="1"
+                            x:Name="FetchButton"
+                            Text="Get comments"
+                            Style="{StaticResource PrimaryButton}"
+                            Clicked="OnFetchClicked" />
+                        <Button
+                            Grid.Column="2"
+                            x:Name="StopButton"
+                            Text="Stop"
+                            IsEnabled="False"
+                            Clicked="OnStopClicked" />
+                        <Button
+                            Grid.Column="3"
+                            x:Name="CsvButton"
+                            Text="CSV ▾"
+                            Clicked="OnCsvClicked"
+                            SemanticProperties.Hint="Export the saved comments to a CSV file or import comments from one" />
+                        <Button
+                            Grid.Column="4"
+                            x:Name="ClearButton"
+                            Text="Clear ▾"
+                            Clicked="OnClearClicked"
+                            SemanticProperties.Hint="Clear the table view or delete saved comments from the database" />
+                    </Grid>
+                    <FlexLayout Wrap="Wrap" AlignItems="Center" Direction="Row">
+                        <Label Text="Videos" Style="{StaticResource FieldLabel}" Margin="0,0,6,0" />
+                        <Entry x:Name="MaxVideosEntry" Keyboard="Numeric" Text="3" WidthRequest="70" />
+                        <Label Text="Comments per video" Style="{StaticResource FieldLabel}" Margin="18,0,6,0" />
+                        <Entry x:Name="MaxCommentsEntry" Keyboard="Numeric" Text="20" WidthRequest="70" />
+                        <Label Text="YouTube order" Style="{StaticResource FieldLabel}" Margin="18,0,6,0" />
+                        <Picker x:Name="OrderPicker" WidthRequest="170">
+                            <Picker.ItemsSource>
+                                <x:Array Type="{x:Type x:String}">
+                                    <x:String>Relevance</x:String>
+                                    <x:String>Newest</x:String>
+                                </x:Array>
+                            </Picker.ItemsSource>
+                        </Picker>
+                    </FlexLayout>
+
+                    <BoxView HeightRequest="1" Color="{StaticResource BorderColor}" Margin="0,2" />
+
+                    <!-- Step 2: the prompt decides what stays after the whole list is sent to Ollama -->
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <Label
+                            Grid.Column="0"
+                            Text="Step 2 - AI qualify"
+                            Style="{StaticResource FieldLabel}"
+                            VerticalOptions="Center" />
+                        <Button
+                            Grid.Column="1"
+                            x:Name="AiSectionToggleButton"
+                            Text="Hide"
+                            Clicked="OnAiSectionToggleClicked" />
+                    </Grid>
+                    <VerticalStackLayout x:Name="AiSectionContent" Spacing="10">
+                        <Button
+                            x:Name="AiQualifyButton"
+                            Text="AI qualify"
+                            Style="{StaticResource PrimaryButton}"
+                            IsEnabled="False"
+                            Clicked="OnAiQualifyClicked" />
+                        <Label x:Name="AiStateLabel" Style="{StaticResource HintLabel}" />
+                        <VerticalStackLayout x:Name="AiProgressPanel" Spacing="4" IsVisible="False">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <ProgressBar
+                                    Grid.Column="0"
+                                    x:Name="AiProgressBar"
+                                    Progress="0"
+                                    ProgressColor="{StaticResource PrimaryColor}"
+                                    VerticalOptions="Center" />
+                                <Label
+                                    Grid.Column="1"
+                                    x:Name="AiProgressPercentLabel"
+                                    Text="0%"
+                                    Style="{StaticResource FieldLabel}"
+                                    VerticalOptions="Center" />
+                            </Grid>
+                            <Label x:Name="AiProgressDetailLabel" Style="{StaticResource HintLabel}" Text="Waiting..." />
+                        </VerticalStackLayout>
+
+                        <Label Text="AI prompt - what kind of comment should be kept?" Style="{StaticResource FieldLabel}" />
+                        <Editor
+                            x:Name="AiPromptEditor"
+                            HeightRequest="80"
+                            AutoSize="TextChanges"
+                            Placeholder="e.g. Is this comment written by someone who could be a potential customer, or asking for help that our service can provide?" />
+                        <Label x:Name="AiPromptHintLabel" Style="{StaticResource HintLabel}" />
+
+                        <BoxView HeightRequest="1" Color="{StaticResource BorderColor}" Margin="0,2" />
+
+                        <!-- Step 3: bulk AI auto-reply to the comments shown in the table -->
+                        <Label
+                            Text="Step 3 - AI auto-reply"
+                            Style="{StaticResource FieldLabel}" />
+                        <Label
+                            Text="Generates a reply for each comment shown in the table and sends it to YouTube, then saves it in traffichuntdb. Comments that already have a reply are skipped."
+                            Style="{StaticResource HintLabel}" />
+                        <Label Text="AI reply prompt - how should the AI respond and what should it say?" Style="{StaticResource FieldLabel}" />
+                        <Editor
+                            x:Name="AiReplyPromptEditor"
+                            HeightRequest="80"
+                            AutoSize="TextChanges"
+                            Placeholder="e.g. Reply in a friendly tone, thank them, answer their question briefly and invite them to reach out. Never sound like a bot." />
+                        <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
+                            <Button
+                                Grid.Column="0"
+                                x:Name="AiReplyButton"
+                                Text="AI reply to shown comments"
+                                Style="{StaticResource PrimaryButton}"
+                                IsEnabled="False"
+                                Clicked="OnAiReplyClicked" />
+                            <Button
+                                Grid.Column="1"
+                                x:Name="AiReplyStopButton"
+                                Text="Stop"
+                                IsEnabled="False"
+                                Clicked="OnAiReplyStopClicked" />
+                            <ActivityIndicator
+                                Grid.Column="2"
+                                x:Name="AiReplyBusyIndicator"
+                                IsVisible="False"
+                                VerticalOptions="Center" />
+                        </Grid>
+                        <Label x:Name="AiReplyStatusLabel" Style="{StaticResource HintLabel}" />
+                    </VerticalStackLayout>
+
+                    <BoxView HeightRequest="1" Color="{StaticResource BorderColor}" Margin="0,2" />
+
+                    <FlexLayout Wrap="Wrap" AlignItems="Center" Direction="Row">
+                        <Entry
+                            x:Name="FilterEntry"
+                            Placeholder="Filter the table by author, comment or video"
+                            WidthRequest="300"
+                            TextChanged="OnFilterChanged" />
+                        <Label Text="Sort" Style="{StaticResource FieldLabel}" Margin="18,0,6,0" />
+                        <Picker x:Name="SortPicker" WidthRequest="190" SelectedIndexChanged="OnSortChanged">
+                            <Picker.ItemsSource>
+                                <x:Array Type="{x:Type x:String}">
+                                    <x:String>Table order</x:String>
+                                    <x:String>Newest comment first</x:String>
+                                    <x:String>Most liked first</x:String>
+                                    <x:String>Author A-Z</x:String>
+                                </x:Array>
+                            </Picker.ItemsSource>
+                        </Picker>
+                    </FlexLayout>
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </Border>
+
+        <!-- Table -->
+        <Grid Grid.Row="1" RowDefinitions="Auto,Auto,Auto,*,Auto" RowSpacing="8">
+
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                <Label
+                    Grid.Column="0"
+                    x:Name="CountLabel"
+                    Text="0 shown"
+                    Style="{StaticResource FieldLabel}"
+                    VerticalOptions="Center" />
+                <Label
+                    Grid.Column="1"
+                    x:Name="SummaryLabel"
+                    Style="{StaticResource StatusText}"
+                    VerticalOptions="Center" />
+                <ActivityIndicator
+                    Grid.Column="2"
+                    x:Name="BusyIndicator"
+                    IsVisible="False"
+                    VerticalOptions="Center" />
+            </Grid>
+
+            <VerticalStackLayout
+                Grid.Row="1"
+                x:Name="WorkProgressPanel"
+                Spacing="2"
+                IsVisible="False">
+                <ProgressBar x:Name="WorkProgressBar" Progress="0" ProgressColor="{StaticResource PrimaryColor}" />
+                <Label x:Name="WorkProgressLabel" Style="{StaticResource HintLabel}" />
+            </VerticalStackLayout>
+
+            <!-- Column headers: keep these widths in step with the row template below. -->
+            <Border Grid.Row="2" Style="{StaticResource TableHeaderRow}">
+                <Grid ColumnDefinitions="36,140,*,200,100,60,140" ColumnSpacing="8">
+                    <Label Grid.Column="0" Text="#" Style="{StaticResource TableHeaderText}" />
+                    <Label Grid.Column="1" Text="Author" Style="{StaticResource TableHeaderText}" />
+                    <Label Grid.Column="2" Text="Comment" Style="{StaticResource TableHeaderText}" />
+                    <Label Grid.Column="3" Text="Video" Style="{StaticResource TableHeaderText}" />
+                    <Label Grid.Column="4" Text="Posted" Style="{StaticResource TableHeaderText}" />
+                    <Label Grid.Column="5" Text="Likes" Style="{StaticResource TableHeaderText}" HorizontalTextAlignment="End" />
+                    <Label Grid.Column="6" Text="Reply" Style="{StaticResource TableHeaderText}" />
+                </Grid>
+            </Border>
+            <CollectionView
+                Grid.Row="3"
+                x:Name="CommentList"
+                SelectionMode="Single"
+                SelectionChanged="OnCommentSelected">
+                <CollectionView.EmptyView>
+                    <VerticalStackLayout Padding="24" Spacing="6" HorizontalOptions="Center">
+                        <Label
+                            Text="No comments to show"
+                            Style="{StaticResource SectionHeader}"
+                            HorizontalOptions="Center" />
+                        <Label
+                            Text="Type a keyword above and press 'Get comments'. Switch on 'Use the AI prompt...' to let the prompt filter the comments, or clear the filter box."
+                            Style="{StaticResource HintLabel}"
+                            HorizontalTextAlignment="Center"
+                            HorizontalOptions="Center" />
+                    </VerticalStackLayout>
+                </CollectionView.EmptyView>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate x:DataType="local:CommentRow">
+                        <Border Style="{StaticResource TableRow}">
+                            <VisualStateManager.VisualStateGroups>
+                                <VisualStateGroup Name="CommonStates">
+                                    <VisualState Name="Normal" />
+                                    <VisualState Name="Selected">
+                                        <VisualState.Setters>
+                                            <Setter Property="BackgroundColor" Value="{StaticResource RowSelectedColor}" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                            <Grid ColumnDefinitions="36,140,*,200,100,60,140" ColumnSpacing="8">
+                                <Label
+                                    Grid.Column="0"
+                                    Text="{Binding Number, StringFormat='{0}.'}"
+                                    Style="{StaticResource CellText}"
+                                    TextColor="{StaticResource MutedColor}" />
+                                <Label Grid.Column="1" Text="{Binding AuthorName}" Style="{StaticResource CellText}" />
+                                <Label Grid.Column="2" Text="{Binding CommentText}" Style="{StaticResource CellText}" MaxLines="2" />
+                                <Label Grid.Column="3" Text="{Binding VideoTitle}" Style="{StaticResource CellText}" MaxLines="2" />
+                                <Label Grid.Column="4" Text="{Binding PostedText}" Style="{StaticResource CellText}" />
+                                <Label Grid.Column="5" Text="{Binding LikeCountText}" Style="{StaticResource CellText}" HorizontalTextAlignment="End" />
+                                <Label
+                                    Grid.Column="6"
+                                    Text="{Binding ReplyDisplayText}"
+                                    Style="{StaticResource CellText}"
+                                    MaxLines="2"
+                                    LineBreakMode="TailTruncation"
+                                    TextColor="{StaticResource SuccessColor}" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+            <!-- Selected comment -->
+            <Border Grid.Row="4" Style="{StaticResource Card}">
+                <VerticalStackLayout Spacing="6">
+                    <Label
+                        x:Name="EmptyDetailLabel"
+                        Text="Select a row to read the full comment and copy it."
+                        Style="{StaticResource HintLabel}" />
+                    <VerticalStackLayout x:Name="DetailPanel" Spacing="6" IsVisible="False">
+                        <Label x:Name="DetailHeaderLabel" FontAttributes="Bold" />
+                        <Label x:Name="DetailMetaLabel" Style="{StaticResource HintLabel}" />
+                        <Border
+                            BackgroundColor="White"
+                            Stroke="{StaticResource BorderColor}"
+                            StrokeThickness="1"
+                            StrokeShape="RoundRectangle 6"
+                            Padding="10">
+                            <ScrollView HeightRequest="90">
+                                <Label x:Name="DetailCommentLabel" LineBreakMode="WordWrap" />
+                            </ScrollView>
+                        </Border>
+                        <HorizontalStackLayout Spacing="8">
+                            <Button Text="Open on YouTube" Clicked="OnOpenClicked" />
+                            <Button Text="Copy comment" Clicked="OnCopyClicked" />
+                            <Button Text="Copy author + link" Clicked="OnCopyAuthorClicked" />
+                        </HorizontalStackLayout>
+
+                        <BoxView HeightRequest="1" Color="{StaticResource BorderColor}" Margin="0,4" />
+
+                        <Label
+                            Text="Reply"
+                            Style="{StaticResource FieldLabel}" />
+                        <Editor
+                            x:Name="ReplyEditor"
+                            HeightRequest="90"
+                            AutoSize="TextChanges"
+                            Placeholder="Write a reply, draft one with the AI, then send it..." />
+                        <HorizontalStackLayout Spacing="8">
+                            <Button
+                                x:Name="DraftReplyButton"
+                                Text="Draft AI reply"
+                                Clicked="OnDraftReplyClicked" />
+                            <Button
+                                x:Name="SendReplyButton"
+                                Text="Send reply"
+                                Style="{StaticResource PrimaryButton}"
+                                Clicked="OnSendReplyClicked" />
+                            <Button
+                                x:Name="CopyReplyButton"
+                                Text="Copy reply"
+                                Clicked="OnCopyReplyClicked" />
+                        </HorizontalStackLayout>
+                        <Label
+                            x:Name="ReplyStatusLabel"
+                            Style="{StaticResource HintLabel}" />
+                    </VerticalStackLayout>
+                </VerticalStackLayout>
+            </Border>
+        </Grid>
+    </Grid>
+
+</ContentPage>

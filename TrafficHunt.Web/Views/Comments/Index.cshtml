@@ -1,0 +1,356 @@
+@model List<Comment>
+@{
+    ViewData["Title"] = "Comment finder";
+    var defaultPrompt = (string?)ViewData["DefaultPrompt"] ?? string.Empty;
+    var defaultReplyPrompt = (string?)ViewData["DefaultReplyPrompt"] ?? string.Empty;
+}
+
+<h1 class="h4 mb-3">Comment finder</h1>
+
+<div class="alert alert-secondary status-strip py-2" id="statusStrip">
+    @(Model.Count) comment(s) loaded from traffichuntdb.
+</div>
+
+<div class="row g-3 mb-3">
+    <!-- Step 1: fetch -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <h2 class="h6 fw-semibold mb-3">Step 1 &mdash; Fetch comments</h2>
+                <form id="fetchForm" class="row g-2">
+                    <div class="col-12">
+                        <input type="text" class="form-control" id="keyword" name="keyword"
+                               placeholder="Keyword, e.g. traffic leads for contractors" required />
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label small mb-1">Videos</label>
+                        <input type="number" class="form-control" id="maxVideos" value="3" min="1" max="25" />
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label small mb-1">Comments per video</label>
+                        <input type="number" class="form-control" id="maxComments" value="20" min="1" max="100" />
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label small mb-1">Order</label>
+                        <select class="form-select" id="order">
+                            <option value="relevance" selected>Relevance</option>
+                            <option value="time">Newest</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary btn-work" id="fetchBtn">
+                            <span class="spinner-border spinner-border-sm d-none"></span>Get comments
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 2: AI qualify -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <h2 class="h6 fw-semibold mb-3">Step 2 &mdash; AI qualify</h2>
+                <p class="text-muted small mb-2">
+                    Sends the whole list to the AI as one JSON payload and keeps only the matches.
+                    Removed comments stay gone until the next fetch.
+                </p>
+                <div class="mb-2">
+                    <label class="form-label small mb-1" for="qualifyPrompt">AI prompt &mdash; what kind of comment should be kept?</label>
+                    <textarea class="form-control" id="qualifyPrompt" rows="3">@defaultPrompt</textarea>
+                </div>
+                <button type="button" class="btn btn-primary btn-work" id="qualifyBtn">
+                    <span class="spinner-border spinner-border-sm d-none"></span>AI qualify
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Step 3: AI auto-reply -->
+<div class="card mb-3">
+    <div class="card-body">
+        <h2 class="h6 fw-semibold mb-3">Step 3 &mdash; AI auto-reply</h2>
+        <p class="text-muted small mb-2">
+            Generates a reply for every comment without one and sends it to YouTube, then saves it in
+            traffichuntdb. Or use the Reply button on a row to draft and send a single reply.
+        </p>
+        <div class="mb-2">
+            <label class="form-label small mb-1" for="replyPrompt">AI reply prompt &mdash; how should the AI respond and what should it say?</label>
+            <textarea class="form-control" id="replyPrompt" rows="3">@defaultReplyPrompt</textarea>
+        </div>
+        <button type="button" class="btn btn-success btn-work" id="aiReplyAllBtn">
+            <span class="spinner-border spinner-border-sm d-none"></span>AI reply to all pending
+        </button>
+    </div>
+</div>
+
+<!-- Table -->
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" id="commentsTable">
+            <thead class="table-light">
+                <tr>
+                    <th>#</th>
+                    <th>Author</th>
+                    <th>Comment</th>
+                    <th>Video</th>
+                    <th>Posted</th>
+                    <th class="text-end">Likes</th>
+                    <th>Reply</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @{
+                    var number = 1;
+                }
+                @foreach (var comment in Model)
+                {
+                    <tr data-id="@comment.CommentId" data-video="@comment.VideoId">
+                        <td>@(number++)</td>
+                        <td>@comment.AuthorName</td>
+                        <td class="comment-cell">@comment.CommentText</td>
+                        <td>@comment.VideoTitle</td>
+                        <td>@(comment.PublishedAt?.ToLocalTime().ToString("yyyy-MM-dd") ?? "-")</td>
+                        <td class="text-end">@comment.LikeCount.ToString("N0")</td>
+                        <td class="reply-cell">
+                            @if (!string.IsNullOrWhiteSpace(comment.ReplyText))
+                            {
+                                <span title="Replied @(comment.RepliedAt?.ToLocalTime().ToString("yyyy-MM-dd HH:mm"))">@comment.ReplyText</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">&mdash;</span>
+                            }
+                        </td>
+                        <td class="text-nowrap">
+                            <button type="button" class="btn btn-sm btn-outline-secondary js-watch" title="Open on YouTube">
+                                <i class="bi bi-box-arrow-up-right"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary js-reply" title="Reply">
+                                <i class="bi bi-reply"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-danger js-delete" title="Delete">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                }
+                @if (Model.Count == 0)
+                {
+                    <tr>
+                        <td colspan="8" class="text-center text-muted py-4">
+                            No comments to show. Type a keyword above and press "Get comments".
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Reply modal -->
+<div class="modal fade" id="replyModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Reply to <span id="replyAuthor"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-2" id="replyCommentText"></p>
+                <input type="hidden" id="replyCommentId" />
+                <label class="form-label small mb-1" for="replyText">Your reply</label>
+                <textarea class="form-control" id="replyText" rows="4"
+                          placeholder="Write a reply, draft one with the AI, then send it..."></textarea>
+                <div class="alert alert-secondary status-strip py-2 mt-2 mb-0" id="replyStatus"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-primary btn-work" id="draftReplyBtn">
+                    <span class="spinner-border spinner-border-sm d-none"></span>Draft AI reply
+                </button>
+                <button type="button" class="btn btn-success btn-work" id="sendReplyBtn">
+                    <span class="spinner-border spinner-border-sm d-none"></span>Send reply
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    $(function () {
+        var replyModal = new bootstrap.Modal('#replyModal');
+
+        // Step 1: fetch comments into traffichuntdb.
+        $('#fetchForm').on('submit', function (event) {
+            event.preventDefault();
+            setBusy('#fetchBtn', true);
+
+            postJson('@Url.Action("Fetch", "Comments")', {
+                keyword: $('#keyword').val(),
+                maxVideos: $('#maxVideos').val(),
+                maxComments: $('#maxComments').val(),
+                order: $('#order').val()
+            })
+                .done(function (response) {
+                    if (response.ok) {
+                        setStatus('Fetched ' + response.fetched + ' comment(s): ' +
+                            response.added + ' added, ' + response.updated + ' updated' +
+                            (response.skipped > 0 ? ', ' + response.skipped + ' video(s) skipped (comments closed)' : '') +
+                            '. Reloading the table...');
+                        setTimeout(function () { window.location.reload(); }, 1200);
+                    } else {
+                        setStatus(response.error, true);
+                        setBusy('#fetchBtn', false);
+                    }
+                })
+                .fail(function (xhr) {
+                    setStatus('Fetch failed: ' + (xhr.responseText || xhr.statusText), true);
+                    setBusy('#fetchBtn', false);
+                });
+        });
+
+        // Step 2: AI qualify.
+        $('#qualifyBtn').on('click', function () {
+            setBusy('#qualifyBtn', true);
+            setStatus('Sending the list to the AI, this can take a while...');
+
+            postJson('@Url.Action("Qualify", "Comments")', { prompt: $('#qualifyPrompt').val() })
+                .done(function (response) {
+                    if (response.ok) {
+                        setStatus('AI kept ' + response.kept + ' of ' + (response.kept + response.removed) +
+                            ' comment(s). Reloading the table...');
+                        setTimeout(function () { window.location.reload(); }, 1200);
+                    } else {
+                        setStatus(response.error, true);
+                        setBusy('#qualifyBtn', false);
+                    }
+                })
+                .fail(function (xhr) {
+                    setStatus('AI qualify failed: ' + (xhr.responseText || xhr.statusText), true);
+                    setBusy('#qualifyBtn', false);
+                });
+        // Step 3: bulk AI auto-reply.
+        $('#aiReplyAllBtn').on('click', function () {
+            if (!confirm('Draft and send an AI reply to every comment without one?')) {
+                return;
+            }
+
+            setBusy('#aiReplyAllBtn', true);
+            setStatus('AI is drafting and sending replies, this can take a while...');
+
+            postJson('@Url.Action("AiReplyAll", "Comments")', { prompt: $('#replyPrompt').val() })
+                .done(function (response) {
+                    if (response.ok) {
+                        setStatus('AI auto-reply finished: ' + response.sent + ' sent of ' + response.total +
+                            (response.empty > 0 ? ' (' + response.empty + ' empty draft(s) skipped)' : '') +
+                            '. Reloading the table...');
+                        setTimeout(function () { window.location.reload(); }, 1200);
+                    } else {
+                        setStatus(response.error, true);
+                        setBusy('#aiReplyAllBtn', false);
+                    }
+                })
+                .fail(function (xhr) {
+                    setStatus('AI auto-reply failed: ' + (xhr.responseText || xhr.statusText), true);
+                    setBusy('#aiReplyAllBtn', false);
+                });
+        });
+
+        // Row actions.
+        $('#commentsTable').on('click', '.js-watch', function () {
+            var $row = $(this).closest('tr');
+            var url = 'https://www.youtube.com/watch?v=' + encodeURIComponent($row.data('video')) +
+                '&lc=' + encodeURIComponent($row.data('id'));
+            window.open(url, '_blank');
+        });
+
+        $('#commentsTable').on('click', '.js-reply', function () {
+            var $row = $(this).closest('tr');
+            var replyText = $row.find('.reply-cell span').first().text();
+
+            $('#replyCommentId').val($row.data('id'));
+            $('#replyAuthor').text($row.find('td').eq(1).text());
+            $('#replyCommentText').text($row.find('td').eq(2).text());
+            $('#replyText').val(replyText === '\u2014' || replyText === '\u2014 ' ? '' : replyText);
+            $('#replyStatus').removeClass('alert-danger').addClass('alert-secondary').text('');
+
+            replyModal.show();
+        });
+
+        $('#commentsTable').on('click', '.js-delete', function () {
+            if (!confirm('Delete this comment from traffichuntdb?')) {
+                return;
+            }
+
+            var $row = $(this).closest('tr');
+
+            postJson('@Url.Action("Delete", "Comments")', { commentId: $row.data('id') })
+                .done(function (response) {
+                    if (response.ok) {
+                        $row.remove();
+                        setStatus('Comment deleted.');
+                    } else {
+                        setStatus('Delete failed.', true);
+                    }
+                })
+                .fail(function (xhr) {
+                    setStatus('Delete failed: ' + (xhr.responseText || xhr.statusText), true);
+                });
+        });
+
+        // Modal actions: draft and send a single reply.
+        $('#draftReplyBtn').on('click', function () {
+            setBusy('#draftReplyBtn', true);
+            $('#replyStatus').removeClass('alert-danger').addClass('alert-secondary').text('Drafting an AI reply...');
+
+            postJson('@Url.Action("DraftReply", "Comments")', {
+                commentId: $('#replyCommentId').val(),
+                prompt: $('#replyPrompt').val()
+            })
+                .done(function (response) {
+                    if (response.ok) {
+                        $('#replyText').val(response.reply);
+                        $('#replyStatus').removeClass('alert-danger').addClass('alert-secondary')
+                            .text('AI reply drafted. Edit it if you like, then press "Send reply".');
+                    } else {
+                        $('#replyStatus').addClass('alert-danger').text(response.error);
+                    }
+                    setBusy('#draftReplyBtn', false);
+                })
+                .fail(function (xhr) {
+                    $('#replyStatus').addClass('alert-danger').text('AI draft failed: ' + (xhr.responseText || xhr.statusText));
+                    setBusy('#draftReplyBtn', false);
+                });
+        });
+
+        $('#sendReplyBtn').on('click', function () {
+            setBusy('#sendReplyBtn', true);
+            $('#replyStatus').removeClass('alert-danger').addClass('alert-secondary').text('Sending the reply...');
+
+            postJson('@Url.Action("SendReply", "Comments")', {
+                commentId: $('#replyCommentId').val(),
+                text: $('#replyText').val()
+            })
+                .done(function (response) {
+                    if (response.ok) {
+                        $('#replyStatus').removeClass('alert-danger').addClass('alert-secondary')
+                            .text('Reply sent and saved. Reloading the table...');
+                        setTimeout(function () { window.location.reload(); }, 1200);
+                    } else {
+                        $('#replyStatus').addClass('alert-danger').text(response.error);
+                        setBusy('#sendReplyBtn', false);
+                    }
+                })
+                .fail(function (xhr) {
+                    $('#replyStatus').addClass('alert-danger').text('Send failed: ' + (xhr.responseText || xhr.statusText));
+                    setBusy('#sendReplyBtn', false);
+                });
+        });
+    });
+</script>
+}

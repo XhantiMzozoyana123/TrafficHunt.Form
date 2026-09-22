@@ -50,6 +50,7 @@ namespace TrafficHunt.Maui
                 }
 
                 SetStatus($"Found {_videos.Count} video(s) for \"{searchDto.Keyword}\".");
+                VideoCountLabel.Text = $"{_videos.Count} video(s)";
             });
         }
 
@@ -83,6 +84,7 @@ namespace TrafficHunt.Maui
         private void OnClearClicked(object? sender, EventArgs e)
         {
             _videos.Clear();
+            VideoCountLabel.Text = "none yet";
             SetStatus(string.Empty);
         }
 

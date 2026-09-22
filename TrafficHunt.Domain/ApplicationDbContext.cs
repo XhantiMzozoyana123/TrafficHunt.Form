@@ -60,9 +60,17 @@ namespace TrafficHunt.Domain
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
+
+            modelBuilder.Entity<Comment>(entity =>
+            {
+                // Refetching the same YouTube comment updates the row instead of duplicating it.
+                entity.HasIndex(comment => comment.CommentId).IsUnique();
+            });
         }
 
         public DbSet<Lead> Leads { get; set; }
+
+        public DbSet<Comment> Comments { get; set; }
     }
 
     /// <summary>

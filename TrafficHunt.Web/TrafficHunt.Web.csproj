@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<RootNamespace>TrafficHunt.Web</RootNamespace>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\TrafficHunt.Application\TrafficHunt.Application.csproj" />
+		<ProjectReference Include="..\TrafficHunt.Domain\TrafficHunt.Domain.csproj" />
+		<ProjectReference Include="..\TrafficHunt.Infrastructure\TrafficHunt.Infrastructure.csproj" />
+	</ItemGroup>
+
+</Project>

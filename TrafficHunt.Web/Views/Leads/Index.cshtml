@@ -1,0 +1,265 @@
+@model List<Lead>
+@{
+    ViewData["Title"] = "Leads";
+}
+
+<h1 class="h4 mb-3">Leads</h1>
+
+<div class="alert alert-secondary status-strip py-2" id="statusStrip">
+    @(Model.Count) lead(s) loaded from traffichuntdb.
+</div>
+
+<div class="row g-3">
+    <!-- Lead list -->
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0" id="leadsTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Name</th>
+                            <th>Comment</th>
+                            <th>Keyword</th>
+                            <th>Status</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var lead in Model)
+                        {
+                            <tr data-id="@lead.Id">
+                                <td>@lead.Name</td>
+                                <td class="comment-cell">@lead.CommentText</td>
+                                <td>@lead.Keyword</td>
+                                <td>
+                                    @if (lead.Replied)
+                                    {
+                                        <span class="badge text-bg-success">replied</span>
+                                    }
+                                    else
+                                    {
+                                        <span class="badge text-bg-warning">pending</span>
+                                    }
+                                </td>
+                                <td class="text-nowrap">
+                                    <button type="button" class="btn btn-sm btn-outline-primary js-reply" title="Reply">
+                                        <i class="bi bi-reply"></i>
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger js-delete" title="Delete">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        }
+                        @if (Model.Count == 0)
+                        {
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4">
+                                    No leads yet.
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reply + bulk -->
+    <div class="col-lg-5">
+        <div class="card mb-3">
+            <div class="card-body">
+                <h2 class="h6 fw-semibold mb-3">Reply to a lead</h2>
+                <input type="hidden" id="leadId" />
+                <p class="text-muted small mb-2" id="leadCommentText"></p>
+                <label class="form-label small mb-1" for="leadReplyText">Your reply</label>
+                <textarea class="form-control mb-2" id="leadReplyText" rows="4"
+                          placeholder="Write a reply, draft one with the AI, then send it..."></textarea>
+                <div class="d-flex gap-2 mb-2">
+                    <button type="button" class="btn btn-outline-primary btn-work" id="draftLeadReplyBtn">
+                        <span class="spinner-border spinner-border-sm d-none"></span>Draft AI reply
+                    </button>
+                    <button type="button" class="btn btn-success btn-work" id="sendLeadReplyBtn">
+                        <span class="spinner-border spinner-border-sm d-none"></span>Send reply
+                    </button>
+                </div>
+                <div class="alert alert-secondary status-strip py-2 mb-0" id="leadReplyStatus"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <h2 class="h6 fw-semibold mb-3">Bulk reply</h2>
+                <p class="text-muted small mb-2">Sends a reply to every pending lead.</p>
+                <div class="mb-2">
+                    <label class="form-label small mb-1" for="bulkPrompt">AI reply prompt</label>
+                    <textarea class="form-control" id="bulkPrompt" rows="2"
+                              placeholder="Describe the reply the AI should write..."></textarea>
+                </div>
+                <div class="mb-2">
+                    <label class="form-label small mb-1" for="bulkMessage">Single message (spintax supported)</label>
+                    <textarea class="form-control" id="bulkMessage" rows="2"
+                              placeholder="Hi {there|friend}, thanks for reaching out..."></textarea>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-primary btn-work" id="bulkAiBtn">
+                        <span class="spinner-border spinner-border-sm d-none"></span>Bulk send with AI
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-work" id="bulkSingleBtn">
+                        <span class="spinner-border spinner-border-sm d-none"></span>Bulk send single message
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+    $(function () {
+        // Selecting a lead for the reply panel.
+        $('#leadsTable').on('click', '.js-reply', function () {
+            var $row = $(this).closest('tr');
+
+            $('#leadId').val($row.data('id'));
+            $('#leadCommentText').text($row.find('td').eq(1).text());
+            $('#leadReplyText').val('');
+            $('#leadReplyStatus').removeClass('alert-danger').addClass('alert-secondary').text('Lead selected.');
+
+            $('html, body').animate({ scrollTop: 0 }, 'slow');
+        });
+
+        // Draft an AI reply for the selected lead.
+        $('#draftLeadReplyBtn').on('click', function () {
+            if (!$('#leadId').val()) {
+                $('#leadReplyStatus').addClass('alert-danger').text('Select a lead first (reply button on its row).');
+                return;
+            }
+
+            setBusy('#draftLeadReplyBtn', true);
+            $('#leadReplyStatus').removeClass('alert-danger').addClass('alert-secondary').text('Drafting an AI reply...');
+
+            postJson('@Url.Action("DraftReply", "Leads")', {
+                leadId: $('#leadId').val(),
+                prompt: $('#bulkPrompt').val()
+            })
+                .done(function (response) {
+                    if (response.ok) {
+                        $('#leadReplyText').val(response.reply);
+                        $('#leadReplyStatus').removeClass('alert-danger').addClass('alert-secondary')
+                            .text('AI reply drafted. Edit it if you like, then press "Send reply".');
+                    } else {
+                        $('#leadReplyStatus').addClass('alert-danger').text(response.error);
+                    }
+                    setBusy('#draftLeadReplyBtn', false);
+                })
+                .fail(function (xhr) {
+                    $('#leadReplyStatus').addClass('alert-danger').text('AI draft failed: ' + (xhr.responseText || xhr.statusText));
+                    setBusy('#draftLeadReplyBtn', false);
+                });
+        });
+
+        // Send the reply for the selected lead.
+        $('#sendLeadReplyBtn').on('click', function () {
+            if (!$('#leadId').val()) {
+                $('#leadReplyStatus').addClass('alert-danger').text('Select a lead first (reply button on its row).');
+                return;
+            }
+
+            setBusy('#sendLeadReplyBtn', true);
+            $('#leadReplyStatus').removeClass('alert-danger').addClass('alert-secondary').text('Sending the reply...');
+
+            postJson('@Url.Action("SendReply", "Leads")', {
+                leadId: $('#leadId').val(),
+                text: $('#leadReplyText').val()
+            })
+                .done(function (response) {
+                    if (response.ok) {
+                        $('#leadReplyStatus').removeClass('alert-danger').addClass('alert-secondary')
+                            .text('Reply sent. Reloading...');
+                        setTimeout(function () { window.location.reload(); }, 1200);
+                    } else {
+                        $('#leadReplyStatus').addClass('alert-danger').text(response.error);
+                        setBusy('#sendLeadReplyBtn', false);
+                    }
+                })
+                .fail(function (xhr) {
+                    $('#leadReplyStatus').addClass('alert-danger').text('Send failed: ' + (xhr.responseText || xhr.statusText));
+                    setBusy('#sendLeadReplyBtn', false);
+                });
+        });
+
+        // Bulk send with the AI.
+        $('#bulkAiBtn').on('click', function () {
+            if (!confirm('Draft and send an AI reply to every pending lead?')) {
+                return;
+            }
+
+            setBusy('#bulkAiBtn', true);
+            setStatus('AI is drafting and sending replies, this can take a while...');
+
+            postJson('@Url.Action("BulkSend", "Leads")', { mode: 'ai', prompt: $('#bulkPrompt').val() })
+                .done(function (response) {
+                    if (response.ok) {
+                        setStatus('Bulk reply finished. Pending leads remaining: ' + response.remaining + '. Reloading...');
+                        setTimeout(function () { window.location.reload(); }, 1200);
+                    } else {
+                        setStatus(response.error, true);
+                        setBusy('#bulkAiBtn', false);
+                    }
+                })
+                .fail(function (xhr) {
+                    setStatus('Bulk send failed: ' + (xhr.responseText || xhr.statusText), true);
+                    setBusy('#bulkAiBtn', false);
+                });
+        });
+
+        // Bulk send with one single message (spintax supported).
+        $('#bulkSingleBtn').on('click', function () {
+            if (!confirm('Send the same message to every pending lead?')) {
+                return;
+            }
+
+            setBusy('#bulkSingleBtn', true);
+            setStatus('Sending the message to every pending lead...');
+
+            postJson('@Url.Action("BulkSend", "Leads")', { mode: 'single', message: $('#bulkMessage').val() })
+                .done(function (response) {
+                    if (response.ok) {
+                        setStatus('Bulk reply finished. Pending leads remaining: ' + response.remaining + '. Reloading...');
+                        setTimeout(function () { window.location.reload(); }, 1200);
+                    } else {
+                        setStatus(response.error, true);
+                        setBusy('#bulkSingleBtn', false);
+                    }
+                })
+                .fail(function (xhr) {
+                    setStatus('Bulk send failed: ' + (xhr.responseText || xhr.statusText), true);
+                    setBusy('#bulkSingleBtn', false);
+                });
+        });
+
+        // Delete a lead.
+        $('#leadsTable').on('click', '.js-delete', function () {
+            if (!confirm('Delete this lead?')) {
+                return;
+            }
+
+            var $row = $(this).closest('tr');
+
+            postJson('@Url.Action("Delete", "Leads")', { leadId: $row.data('id') })
+                .done(function (response) {
+                    if (response.ok) {
+                        $row.remove();
+                        setStatus('Lead deleted.');
+                    } else {
+                        setStatus('Delete failed.', true);
+                    }
+                })
+                .fail(function (xhr) {
+                    setStatus('Delete failed: ' + (xhr.responseText || xhr.statusText), true);
+                });
+        });
+    });
+</script>
+}

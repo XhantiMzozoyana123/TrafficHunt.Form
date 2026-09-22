@@ -50,7 +50,7 @@
                 SelectionChanged="OnLeadSelected">
                 <CollectionView.EmptyView>
                     <Label
-                        Text="No leads yet. Run a hunt from the Search tab."
+                        Text="No leads yet. Run a hunt from the 'Search &amp; Hunt' tab - saving leads also needs the MySQL database configured on the Settings tab."
                         Style="{StaticResource HintLabel}"
                         HorizontalOptions="Center" />
                 </CollectionView.EmptyView>

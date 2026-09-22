@@ -20,12 +20,18 @@ namespace TrafficHunt.Infrastructure.Services
             _youtubeDataApi = youtubeDataApi;
         }
 
-        public async Task<List<YouTubeCommentDto>> GetCommentsAsync(SearchDto searchDto, string videoId)
+        public async Task<List<YouTubeCommentDto>> GetCommentsAsync(SearchDto searchDto, string videoId, string? order = null)
         {
             var request = _youtubeDataApi.CommentThreads.List("snippet");
 
             request.VideoId = videoId;
-            request.MaxResults = searchDto.MaxResult;
+
+            // YouTube accepts between 1 and 100 comments per request.
+            request.MaxResults = Math.Clamp(searchDto.MaxResult, 1, 100);
+
+            request.Order = string.Equals(order, "time", StringComparison.OrdinalIgnoreCase)
+                ? CommentThreadsResource.ListRequest.OrderEnum.Time
+                : CommentThreadsResource.ListRequest.OrderEnum.Relevance;
 
             var response = await request.ExecuteAsync();
 
@@ -40,10 +46,27 @@ namespace TrafficHunt.Infrastructure.Services
                     YouTubeVideoId = videoId,
                     AuthorChannelId = snippet.AuthorChannelId?.Value ?? "",
                     AuthorDisplayName = snippet.AuthorDisplayName,
-                    Text = snippet.TextOriginal,
+                    Text = snippet.TextOriginal ?? snippet.TextDisplay ?? string.Empty,
+                    PublishedAt = snippet.PublishedAtDateTimeOffset,
+                    LikeCount = snippet.LikeCount ?? 0,
                     IsReply = false,
                 };
             }).ToList();
+        }
+
+        /// <summary>
+        /// Uses videos.list with chart=mostPopular (1 quota unit) purely to confirm the
+        /// configured API key is accepted. Any GoogleApiException (invalid, disabled or
+        /// referrer/IP-restricted key) is surfaced to the caller.
+        /// </summary>
+        public async Task ValidateApiKeyAsync()
+        {
+            var request = _youtubeDataApi.Videos.List("snippet");
+
+            request.Chart = VideosResource.ListRequest.ChartEnum.MostPopular;
+            request.MaxResults = 1;
+
+            await request.ExecuteAsync();
         }
 
         public async Task<List<YouTubeVideoDto>> SearchVideosAsync(SearchDto searchDto)
