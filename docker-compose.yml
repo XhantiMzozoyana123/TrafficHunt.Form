@@ -1,7 +1,4 @@
 services:
-  # ---------------------------------------------------------------------------
-  # TrafficHunt.Web - the MVC app (now uses SQLite, no MySQL needed)
-  # ---------------------------------------------------------------------------
   web:
     build:
       context: .
@@ -11,17 +8,14 @@ services:
     env_file:
       - ./docker/.env
     environment:
-      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT}
-      - ASPNETCORE_URLS=${ASPNETCORE_URLS}
-      - ConnectionStrings__DefaultConnection=${CONNECTION_STRING}
-      - YouTube__ApiKey=${YOUTUBE_API_KEY}
-      - LLM__Url=${LLM_URL}
-      - LLM__Model=${LLM_MODEL}
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Production}
+      - ASPNETCORE_URLS=${ASPNETCORE_URLS:-http://+:8080}
+      - ConnectionStrings__DefaultConnection=${CONNECTION_STRING:-Data Source=App_Data/traffichunt.db}
+      - YouTube__ApiKey=${YOUTUBE_API_KEY:-AIzaSyD38e262JU3hLOp3Uhw7YWwsbN6sQrn48c}
+      - LLM__Url=${LLM_URL:-http://46.202.170.203:11434/api/generate}
+      - LLM__Model=${LLM_MODEL:-llama3:latest}
     ports:
       - "5000:8080"
-    # No MySQL dependency — SQLite is embedded in the app's data volume.
-    # Remove the depends_on block below if you still want a local MySQL for
-    # the MAUI app; the Web app no longer talks to MySQL.
     volumes:
       - traffichunt-web-data:/app/App_Data
     networks:
@@ -32,15 +26,7 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-    profiles:
-      - default
 
-  # ---------------------------------------------------------------------------
-  # MySQL - no longer required by TrafficHunt.Web (SQLite instead).
-  # Kept here only if you still need it for the MAUI app or for migration
-  # reference. Uncomment the depends_on in the web service above if you want
-  # the Web container to wait for MySQL anyway.
-  # ---------------------------------------------------------------------------
   mysql:
     image: mysql:8.4
     container_name: traffichunt-mysql
@@ -48,10 +34,10 @@ services:
     env_file:
       - ./docker/.env
     environment:
-      - MYSQL_DATABASE=${MYSQL_DATABASE}
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
-      - MYSQL_USER=${MYSQL_USER}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-traffichuntdb}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-}
+      - MYSQL_USER=${MYSQL_USER:-traffichunt}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-ChangeMeStrong!}
     ports:
       - "3306:3306"
     volumes:
@@ -64,17 +50,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
-    profiles:
-      - mysql
 
-  # ---------------------------------------------------------------------------
-  # Ollama - local LLM backend (llama3:latest is pulled on first use)
-  # ---------------------------------------------------------------------------
-  # If you prefer the remote Ollama instance already configured in
-  # appsettings.json (http://46.202.170.203:11434), either:
-  #   1) Leave this service out of compose, OR
-  #   2) Set LLM_URL=http://46.202.170.203:11434/api/generate in .env
-  # Keep the bind mount if you want models/persisted state to survive restarts.
   ollama:
     image: ollama/ollama:latest
     container_name: traffichunt-ollama
@@ -85,14 +61,7 @@ services:
       - traffichunt-ollama-data:/root/.ollama
     networks:
       - traffichunt
-    profiles:
-      - ollama
 
-  # ---------------------------------------------------------------------------
-  # Nginx - optional reverse proxy for production HTTPS
-  # ---------------------------------------------------------------------------
-  # Enable with: docker compose --profile nginx up -d
-  # Then run: sudo certbot --nginx -d yourdomain.com
   nginx:
     image: nginx:alpine
     container_name: traffichunt-nginx
@@ -107,8 +76,6 @@ services:
       - web
     networks:
       - traffichunt
-    profiles:
-      - nginx
 
 volumes:
   traffichunt-mysql-data:
