@@ -9,7 +9,7 @@ services:
       - ./docker/.env
     environment:
       - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Production}
-      - ASPNETCORE_URLS=${ASPNETCORE_URLS:-http://+:8080}
+      - ASPNETCORE_URLS=${ASPNETCORE_URLS:-http://0.0.0.0:8080}
       - ConnectionStrings__DefaultConnection=${CONNECTION_STRING:-Data Source=App_Data/traffichunt.db}
       - YouTube__ApiKey=${YOUTUBE_API_KEY:-AIzaSyD38e262JU3hLOp3Uhw7YWwsbN6sQrn48c}
       - LLM__Url=${LLM_URL:-http://46.202.170.203:11434/api/generate}
