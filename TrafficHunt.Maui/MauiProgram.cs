@@ -30,8 +30,8 @@ namespace TrafficHunt.Maui
 
             builder.Configuration.AddJsonFile("appsettings.json", optional: true, reloadOnChange: true);
 
-            // Database (MySQL / MariaDB)
-            builder.Services.AddMySqlDbContext(builder.Configuration);
+            // Database (SQLite) - single file database, no external server needed.
+            builder.Services.AddSqliteDbContext(builder.Configuration);
 
             // Shared HTTP client used by the LLM (Ollama) service.
             builder.Services.AddSingleton(new HttpClient { Timeout = TimeSpan.FromMinutes(5) });

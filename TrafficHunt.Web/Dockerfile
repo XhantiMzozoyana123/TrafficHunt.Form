@@ -22,4 +22,5 @@ RUN dotnet publish "TrafficHunt.Web.csproj" -c $BUILD_CONFIGURATION -o /app/publ
 FROM base AS final
 WORKDIR /app
 COPY --from=build /app/publish .
+RUN mkdir -p App_Data
 ENTRYPOINT ["dotnet", "TrafficHunt.Web.dll"]

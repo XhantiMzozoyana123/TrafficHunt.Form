@@ -17,12 +17,12 @@ namespace TrafficHunt.Web
 
             builder.Services.AddControllersWithViews();
 
-            // Database (MySQL / MariaDB) - same traffichuntdb the MAUI app uses.
+            // Database (SQLite) - single file database, no external server needed.
             var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-                ?? "Server=localhost;Database=traffichuntdb;User=root;Password=";
+                ?? "Data Source=traffichunt.db";
 
             builder.Services.AddDbContext<ApplicationDbContext>(options =>
-                options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+                options.UseSqlite(connectionString));
 
             // Shared HTTP client used by the LLM (Ollama) service.
             builder.Services.AddSingleton(new HttpClient { Timeout = TimeSpan.FromMinutes(5) });

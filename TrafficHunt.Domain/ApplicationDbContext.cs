@@ -1,8 +1,8 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System;
+using System.IO;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.IO;
 using TrafficHunt.Domain.Entities;
 
 namespace TrafficHunt.Domain
@@ -49,10 +49,10 @@ namespace TrafficHunt.Domain
                 .Build();
 
             var connectionString = configuration.GetConnectionString("DefaultConnection")
-                ?? "Server=localhost;Database=traffichuntdb;User=root;Password=";
+                ?? "Data Source=traffichunt.db";
 
             var optionsBuilder = new DbContextOptionsBuilder<ApplicationDbContext>();
-            optionsBuilder.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
+            optionsBuilder.UseSqlite(connectionString);
 
             return optionsBuilder.Options;
         }
@@ -74,20 +74,20 @@ namespace TrafficHunt.Domain
     }
 
     /// <summary>
-    /// Extension methods for registering ApplicationDbContext with MySQL.
+    /// Extension methods for registering ApplicationDbContext with SQLite.
     /// </summary>
     public static class ApplicationDbContextExtensions
     {
         /// <summary>
-        /// Registers ApplicationDbContext with MySQL using the DefaultConnection from configuration.
+        /// Registers ApplicationDbContext with SQLite using the DefaultConnection from configuration.
         /// </summary>
-        public static IServiceCollection AddMySqlDbContext(this IServiceCollection services, IConfiguration configuration)
+        public static IServiceCollection AddSqliteDbContext(this IServiceCollection services, IConfiguration configuration)
         {
             var connectionString = configuration.GetConnectionString("DefaultConnection")
-                ?? "Server=localhost;Database=traffichuntdb;User=root;Password=";
+                ?? "Data Source=traffichunt.db";
 
             services.AddDbContext<ApplicationDbContext>(options =>
-                options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+                options.UseSqlite(connectionString));
 
             return services;
         }

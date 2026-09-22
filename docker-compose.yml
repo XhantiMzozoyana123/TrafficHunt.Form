@@ -2,7 +2,7 @@ version: "3.9"
 
 services:
   # ---------------------------------------------------------------------------
-  # TrafficHunt.Web - the MVC app you originally asked to run
+  # TrafficHunt.Web - the MVC app (now uses SQLite, no MySQL needed)
   # ---------------------------------------------------------------------------
   web:
     build:
@@ -21,13 +21,11 @@ services:
       - LLM__Model=${LLM_MODEL}
     ports:
       - "5000:8080"
-    depends_on:
-      mysql:
-        condition: service_healthy
-      # ollama is optional for the app to start; remove the depends_on line
-      # below if you want to use the remote Ollama instance instead.
-      ollama:
-        condition: service_started
+    # No MySQL dependency — SQLite is embedded in the app's data volume.
+    # Remove the depends_on block below if you still want a local MySQL for
+    # the MAUI app; the Web app no longer talks to MySQL.
+    volumes:
+      - traffichunt-web-data:/app/App_Data
     networks:
       - traffichunt
     healthcheck:
@@ -40,7 +38,10 @@ services:
       - default
 
   # ---------------------------------------------------------------------------
-  # MySQL - same traffichuntdb the MAUI app uses
+  # MySQL - no longer required by TrafficHunt.Web (SQLite instead).
+  # Kept here only if you still need it for the MAUI app or for migration
+  # reference. Uncomment the depends_on in the web service above if you want
+  # the Web container to wait for MySQL anyway.
   # ---------------------------------------------------------------------------
   mysql:
     image: mysql:8.4
@@ -66,7 +67,7 @@ services:
       retries: 5
       start_period: 20s
     profiles:
-      - default
+      - mysql
 
   # ---------------------------------------------------------------------------
   # Ollama - local LLM backend (llama3:latest is pulled on first use)
@@ -114,6 +115,7 @@ services:
 volumes:
   traffichunt-mysql-data:
   traffichunt-ollama-data:
+  traffichunt-web-data:
 
 networks:
   traffichunt:
