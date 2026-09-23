@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using TrafficHunt.Application.Dtos;
 using TrafficHunt.Application.Interfaces;
 using TrafficHunt.Domain;
+using Microsoft.Extensions.DependencyInjection;
 using TrafficHunt.Domain.Entities;
 
 namespace TrafficHunt.Web.Controllers
@@ -35,6 +36,9 @@ namespace TrafficHunt.Web.Controllers
                 .OrderByDescending(comment => comment.CreatedAt)
                 .ToListAsync();
 
+            ViewData["DefaultPrompt"] = HttpContext.RequestServices.GetRequiredService<IConfiguration>()["Hunt:DefaultPrompt"] ?? string.Empty;
+            ViewData["DefaultReplyPrompt"] = HttpContext.RequestServices.GetRequiredService<IConfiguration>()["Hunt:DefaultReplyPrompt"] ?? string.Empty;
+
             return View(comments);
         }
 
@@ -45,15 +49,21 @@ namespace TrafficHunt.Web.Controllers
         /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Fetch(string keyword, int maxVideos, int maxComments, string order)
+        public async Task<IActionResult> Fetch([FromForm] string keyword, [FromForm] int maxVideos, [FromForm] int maxComments, [FromForm] string order)
         {
             try
             {
                 keyword = keyword?.Trim() ?? string.Empty;
 
+                // Remember the inputs so the server-rendered form can show them again after the redirect.
+                TempData["FetchKeyword"] = keyword;
+                TempData["FetchMaxVideos"] = Math.Clamp(maxVideos, 1, 25).ToString();
+                TempData["FetchMaxComments"] = Math.Clamp(maxComments, 1, 100).ToString();
+                TempData["FetchOrder"] = string.IsNullOrWhiteSpace(order) ? "relevance" : order.Trim();
+
                 if (string.IsNullOrWhiteSpace(keyword))
                 {
-                    return Json(new { ok = false, error = "Type a keyword first." });
+                    TempData["FetchError"] = "Type a keyword first."; return RedirectToAction(nameof(Index));
                 }
 
                 var videoSearch = new SearchDto
@@ -66,7 +76,7 @@ namespace TrafficHunt.Web.Controllers
 
                 if (videos.Count == 0)
                 {
-                    return Json(new { ok = false, error = $"No videos found for \"{keyword}\"." });
+                    TempData["FetchError"] = "No videos found."; return RedirectToAction(nameof(Index));
                 }
 
                 var added = 0;
@@ -141,11 +151,11 @@ namespace TrafficHunt.Web.Controllers
                     await _db.SaveChangesAsync();
                 }
 
-                return Json(new { ok = true, added, updated, fetched, skipped });
+                TempData["Status"] = "Got " + fetched.ToString() + " comments (" + added.ToString() + " new, " + updated.ToString() + " updated, " + skipped.ToString() + " skipped)."; return RedirectToAction(nameof(Index));
             }
             catch (Exception ex)
             {
-                return Json(new { ok = false, error = ex.Message });
+                TempData["FetchError"] = ex.Message; return RedirectToAction(nameof(Index));
             }
         }
 
@@ -155,15 +165,18 @@ namespace TrafficHunt.Web.Controllers
         /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Qualify(string prompt)
+        public async Task<IActionResult> AiQualify([FromForm] string prompt)
         {
             try
             {
                 prompt = prompt?.Trim() ?? string.Empty;
 
+                // Remember the prompt so the server-rendered form can show it again after the redirect.
+                TempData["QualifyPrompt"] = prompt;
+
                 if (string.IsNullOrWhiteSpace(prompt))
                 {
-                    return Json(new { ok = false, error = "Write the AI prompt first." });
+                    TempData["QualifyError"] = "Write the AI prompt first."; return RedirectToAction(nameof(Index));
                 }
 
                 var comments = await _db.Comments
@@ -172,7 +185,7 @@ namespace TrafficHunt.Web.Controllers
 
                 if (comments.Count == 0)
                 {
-                    return Json(new { ok = false, error = "Fetch comments first." });
+                    TempData["QualifyError"] = "Fetch comments first."; return RedirectToAction(nameof(Index));
                 }
 
                 var payload = comments
@@ -200,53 +213,104 @@ namespace TrafficHunt.Web.Controllers
 
                 await _db.SaveChangesAsync();
 
-                return Json(new { ok = true, kept = keptIds.Count, removed = comments.Count - keptIds.Count });
+                TempData["Status"] = "AI kept " + keptIds.Count.ToString() + "; removed " + (comments.Count - keptIds.Count).ToString() + "."; return RedirectToAction(nameof(Index));
             }
             catch (Exception ex)
             {
-                return Json(new { ok = false, error = ex.Message });
+                TempData["QualifyError"] = ex.Message; return RedirectToAction(nameof(Index));
             }
+        }
+
+        /// <summary>
+        /// Remembers which comment the reply composer should work on. This is what the Reply
+        /// button on a table row posts, because the page no longer uses client-side JavaScript.
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult SelectForReply([FromForm] string commentId)
+        {
+            commentId = commentId?.Trim() ?? string.Empty;
+
+            TempData["DraftCommentId"] = commentId;
+
+            if (string.IsNullOrWhiteSpace(commentId))
+            {
+                TempData["ReplyError"] = "Pick a comment first.";
+            }
+
+            return RedirectToAction(nameof(Index));
         }
 
         /// <summary>Drafts one AI reply for a comment, without sending anything.</summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DraftReply(string commentId, string prompt)
+        public async Task<IActionResult> DraftReply([FromForm] string commentId, [FromForm] string prompt)
         {
             try
             {
+                commentId = commentId?.Trim() ?? string.Empty;
+                prompt = prompt?.Trim() ?? string.Empty;
+
+                // Remember the selection and the prompt so the server-rendered composer can show them again.
+                TempData["DraftCommentId"] = commentId;
+                TempData["ReplyPrompt"] = prompt;
+
+                if (string.IsNullOrWhiteSpace(commentId))
+                {
+                    TempData["ReplyError"] = "Pick a comment first."; return RedirectToAction(nameof(Index));
+                }
+
+                if (string.IsNullOrWhiteSpace(prompt))
+                {
+                    TempData["ReplyError"] = "Write the AI reply prompt first."; return RedirectToAction(nameof(Index));
+                }
+
                 var comment = await _db.Comments
                     .FirstOrDefaultAsync(item => item.CommentId == commentId);
 
                 if (comment is null)
                 {
-                    return Json(new { ok = false, error = "Comment not found." });
+                    TempData["ReplyError"] = "Draft failed: comment not found."; return RedirectToAction(nameof(Index));
                 }
 
                 var reply = (await _aiService.AIGeneratedReplyAsync(comment.CommentText, prompt ?? string.Empty)).Trim();
 
-                return string.IsNullOrWhiteSpace(reply)
-                    ? Json(new { ok = false, error = "The AI returned an empty reply. Check the LLM settings." })
-                    : Json(new { ok = true, reply });
+                if (string.IsNullOrWhiteSpace(reply))
+                {
+                    TempData["ReplyError"] = "AI returned an empty reply."; return RedirectToAction(nameof(Index));
+                }
+
+                TempData["DraftedReply"] = reply;
+                TempData["Status"] = "AI draft ready for comment " + commentId + ".";
+                return RedirectToAction(nameof(Index));
             }
             catch (Exception ex)
             {
-                return Json(new { ok = false, error = ex.Message });
+                TempData["ReplyError"] = ex.Message; return RedirectToAction(nameof(Index));
             }
         }
 
         /// <summary>Posts a reply to YouTube and stores it on the Comment row.</summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> SendReply(string commentId, string text)
+        public async Task<IActionResult> SendReply([FromForm] string commentId, [FromForm] string replyText, [FromForm] string? prompt)
         {
             try
             {
-                text = text?.Trim() ?? string.Empty;
+                replyText = replyText?.Trim() ?? string.Empty;
+                commentId = commentId?.Trim() ?? string.Empty;
 
-                if (string.IsNullOrWhiteSpace(text))
+                // Remember the selection so the server-rendered composer can show it again after the redirect.
+                TempData["DraftCommentId"] = commentId;
+
+                if (string.IsNullOrWhiteSpace(commentId))
                 {
-                    return Json(new { ok = false, error = "Write a reply first." });
+                    TempData["ReplyError"] = "Pick a comment first."; return RedirectToAction(nameof(Index));
+                }
+
+                if (string.IsNullOrWhiteSpace(replyText))
+                {
+                    TempData["ReplyError"] = "Write a reply first."; return RedirectToAction(nameof(Index));
                 }
 
                 var comment = await _db.Comments
@@ -254,31 +318,32 @@ namespace TrafficHunt.Web.Controllers
 
                 if (comment is null)
                 {
-                    return Json(new { ok = false, error = "Comment not found." });
+                    // Keep what the user typed so the composer shows it again.
+                    TempData["DraftedReply"] = replyText;
+                    TempData["ReplyError"] = "Send failed: comment not found."; return RedirectToAction(nameof(Index));
                 }
 
                 await _messengerService.SendMessageAsync(new MessengerDto
                 {
                     CommentId = commentId,
-                    Messege = text
+                    Messege = replyText
                 });
 
-                comment.ReplyText = text;
+                comment.ReplyText = replyText;
                 comment.RepliedAt = DateTime.UtcNow;
                 comment.UpdatedAt = DateTime.UtcNow;
 
                 await _db.SaveChangesAsync();
 
-                return Json(new { ok = true });
+                TempData["Status"] = "Reply sent and saved."; return RedirectToAction(nameof(Index));
             }
             catch (Exception ex)
             {
-                return Json(new
-                {
-                    ok = false,
-                    error = ex.Message +
-                        " (posting comments requires an OAuth-authorized YouTube client, an API key alone cannot post)"
-                });
+                // Keep what the user typed so the composer shows it again.
+                TempData["DraftedReply"] = replyText;
+                TempData["ReplyError"] = ex.Message +
+                    " (posting comments requires an OAuth-authorized YouTube client, an API key alone cannot post)";
+                return RedirectToAction(nameof(Index));
             }
         }
 
@@ -289,15 +354,18 @@ namespace TrafficHunt.Web.Controllers
         /// </summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> AiReplyAll(string prompt)
+        public async Task<IActionResult> AiReplyAll([FromForm] string prompt)
         {
             try
             {
                 prompt = prompt?.Trim() ?? string.Empty;
 
+                // Remember the prompt so the server-rendered form can show it again after the redirect.
+                TempData["BulkReplyPrompt"] = prompt;
+
                 if (string.IsNullOrWhiteSpace(prompt))
                 {
-                    return Json(new { ok = false, error = "Write the AI reply prompt first." });
+                    TempData["ReplyError"] = "Write the AI reply prompt first."; return RedirectToAction(nameof(Index));
                 }
 
                 var targets = await _db.Comments
@@ -307,7 +375,7 @@ namespace TrafficHunt.Web.Controllers
 
                 if (targets.Count == 0)
                 {
-                    return Json(new { ok = false, error = "Every comment already has a reply (or the table is empty)." });
+                    TempData["ReplyError"] = "Every comment already has a reply (or the table is empty)."; return RedirectToAction(nameof(Index));
                 }
 
                 var sent = 0;
@@ -337,23 +405,20 @@ namespace TrafficHunt.Web.Controllers
                     sent++;
                 }
 
-                return Json(new { ok = true, sent, empty, total = targets.Count });
+                TempData["Status"] = "AI replies sent: " + sent.ToString() + " of " + targets.Count.ToString() + " (" + empty.ToString() + " empty)."; return RedirectToAction(nameof(Index));
             }
             catch (Exception ex)
             {
-                return Json(new
-                {
-                    ok = false,
-                    error = ex.Message +
-                        " (posting comments requires an OAuth-authorized YouTube client)"
-                });
+                TempData["ReplyError"] = ex.Message +
+                    " (posting comments requires an OAuth-authorized YouTube client)";
+                return RedirectToAction(nameof(Index));
             }
         }
 
         /// <summary>Hard-deletes one comment from traffichuntdb.</summary>
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Delete(string commentId)
+        public async Task<IActionResult> Delete([FromForm] string commentId)
         {
             try
             {
@@ -361,11 +426,11 @@ namespace TrafficHunt.Web.Controllers
                     .Where(comment => comment.CommentId == commentId)
                     .ExecuteDeleteAsync();
 
-                return Json(new { ok = deleted > 0 });
+                TempData["Status"] = deleted > 0 ? "Comment deleted." : "Nothing deleted."; return RedirectToAction(nameof(Index));
             }
             catch (Exception ex)
             {
-                return Json(new { ok = false, error = ex.Message });
+                TempData["Status"] = ex.Message; return RedirectToAction(nameof(Index));
             }
         }
     }
