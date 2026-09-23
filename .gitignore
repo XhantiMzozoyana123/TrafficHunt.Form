@@ -361,3 +361,9 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Local docker compose overrides (may hold real API keys / passwords).
+# docker/.env is already tracked and only contains placeholders.
+.env
+.env.local
+.env.*.local

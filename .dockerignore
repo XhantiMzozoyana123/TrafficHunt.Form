@@ -1,0 +1,25 @@
+# Keep the build context small and free of host-specific build output.
+# Without this, `COPY . .` sends bin/obj generated on Windows into the Linux SDK image.
+**/bin/
+**/obj/
+.vs/
+.vscode/
+.git/
+.gitignore
+.gitattributes
+**/*.user
+
+# Local SQLite database - the container keeps its own copy in the
+# traffichunt-web-data volume, so never bake a developer's data into the image.
+**/App_Data/
+
+# Logs and local notes
+**/*.log
+**/*.tmp
+
+# Compose/config files are read by the client, not needed inside the image
+Dockerfile
+**/Dockerfile
+docker-compose*.yml
+.dockerignore
+README.md

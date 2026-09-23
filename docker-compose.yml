@@ -35,7 +35,7 @@ services:
       - ./docker/.env
     environment:
       - MYSQL_DATABASE=${MYSQL_DATABASE:-traffichuntdb}
-      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-}
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-ChangeMeStrong!}
       - MYSQL_USER=${MYSQL_USER:-traffichunt}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD:-ChangeMeStrong!}
     ports:
